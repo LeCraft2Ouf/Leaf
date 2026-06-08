@@ -1,0 +1,397 @@
+From 0000000000000000000000000000000000000000 Mon Sep 17 00:00:00 2001
+From: LeCraft2Ouf <robartalexis62@gmail.com>
+Date: Mon, 8 Jun 2026 17:02:11 +0200
+Subject: [PATCH] Neodium: Nexo blocs, cultures sans lumiere, cactus/farm/melon
+ enhance
+
+Co-authored-by: Cursor <cursoragent@cursor.com>
+
+diff --git a/net/minecraft/world/item/HoeItem.java b/net/minecraft/world/item/HoeItem.java
+index bf14cbcc6ed4c89ef6f15b3cb248a599cbc26e29..df301ec7617c4d8aa9a554f741e88b310fea7b8d 100644
+--- a/net/minecraft/world/item/HoeItem.java
++++ b/net/minecraft/world/item/HoeItem.java
+@@ -17,6 +17,7 @@ import net.minecraft.world.level.ItemLike;
+ import net.minecraft.world.level.Level;
+ import net.minecraft.world.level.block.Block;
+ import net.minecraft.world.level.block.Blocks;
++import net.minecraft.world.level.block.FarmBlock;
+ import net.minecraft.world.level.block.state.BlockState;
+ import net.minecraft.world.level.gameevent.GameEvent;
+ 
+@@ -24,11 +25,11 @@ public class HoeItem extends Item {
+     protected static final Map<Block, Pair<Predicate<UseOnContext>, Consumer<UseOnContext>>> TILLABLES = Maps.newHashMap(
+         ImmutableMap.of(
+             Blocks.GRASS_BLOCK,
+-            Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.FARMLAND.defaultBlockState())),
++            Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.FARMLAND.defaultBlockState().setValue(FarmBlock.MOISTURE, FarmBlock.MAX_MOISTURE))),
+             Blocks.DIRT_PATH,
+-            Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.FARMLAND.defaultBlockState())),
++            Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.FARMLAND.defaultBlockState().setValue(FarmBlock.MOISTURE, FarmBlock.MAX_MOISTURE))),
+             Blocks.DIRT,
+-            Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.FARMLAND.defaultBlockState())),
++            Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.FARMLAND.defaultBlockState().setValue(FarmBlock.MOISTURE, FarmBlock.MAX_MOISTURE))),
+             Blocks.COARSE_DIRT,
+             Pair.of(HoeItem::onlyIfAirAbove, changeIntoState(Blocks.DIRT.defaultBlockState())),
+             Blocks.ROOTED_DIRT,
+diff --git a/net/minecraft/world/level/block/CactusBlock.java b/net/minecraft/world/level/block/CactusBlock.java
+index b1974c6f611d0a4ee34a682fd72064b9f5c2a5e5..118c62827f527915948f18b60fe3ca66049e5f19 100644
+--- a/net/minecraft/world/level/block/CactusBlock.java
++++ b/net/minecraft/world/level/block/CactusBlock.java
+@@ -52,58 +52,7 @@ public class CactusBlock extends Block implements BonemealableBlock { // Purpur
+ 
+     @Override
+     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+-        // Pluto start - Decrease chunk/block lookups
+-        final int x = pos.getX();
+-        final int z = pos.getZ();
+-        net.minecraft.world.level.chunk.LevelChunk chunk = level.getChunkIfLoaded(x >> 4, z >> 4);
+-        if (chunk == null) return;
+-
+-        final int y = pos.getY();
+-        if (chunk.getBlockState(x, y + 1, z).isAir()) {
+-            // Pluto end - Decrease chunk/block lookups
+-            int i = 1;
+-            int ageValue = state.getValue(AGE);
+-
+-            while (chunk.getBlockState(pos.below(i)).is(this)) { // Pluto - Decrease chunk/block lookups
+-                if (++i == level.paperConfig().maxGrowthHeight.cactus && ageValue == 15) { // Paper - Configurable cactus/bamboo/reed growth height
+-                    return;
+-                }
+-            }
+-
+-            // Pluto start - Decrease chunk/block lookups
+-            BlockPos blockPos = null;
+-            if (ageValue == 8 && this.canSurvive(this.defaultBlockState(), level, blockPos = pos.above())) {
+-                // Pluto end - Decrease chunk/block lookups
+-                double d = i >= level.paperConfig().maxGrowthHeight.cactus ? 0.25 : 0.1; // Paper - Configurable cactus/bamboo/reed growth height
+-                if (random.nextDouble() <= d) {
+-                    org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, blockPos, Blocks.CACTUS_FLOWER.defaultBlockState(), Block.UPDATE_ALL);
+-                }
+-            } else if (ageValue == 15 && i < level.paperConfig().maxGrowthHeight.cactus) { // Paper - Configurable cactus/bamboo/reed growth height
+-                // Pluto start - Check if the cactus can even survive being placed
+-                if (org.dreeam.leaf.config.modules.opt.CheckSurvivalBeforeGrowth.cactusCheckSurvivalBeforeGrowth && !canSurvive(level, blockPos = pos.above())) { // Pluto - Decrease chunk/block lookups
+-                    level.levelEvent(LevelEvent.PARTICLES_DESTROY_BLOCK, blockPos, Block.getId(state));
+-                    // We're going to fake the block breaking to match vanilla standards.
+-                    for (net.minecraft.world.item.ItemStack drop : Block.getDrops(state, level, pos, null)) { // Use base cactus since we don't place a block
+-                        Block.popResource(level, blockPos, drop);
+-                    }
+-                    level.setBlock(pos, state.setValue(CactusBlock.AGE, 0), Block.UPDATE_NONE);
+-                    return;
+-                }
+-                // Pluto end - Check if the cactus can even survive being placed
+-                // Paper start
+-                if (!org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, blockPos == null ? blockPos = pos.above() : blockPos, this.defaultBlockState(), Block.UPDATE_ALL)) { // Pluto - Decrease chunk/block lookups
+-                    return;
+-                }
+-                // Paper end
+-                BlockState blockState = state.setValue(AGE, 0);
+-                level.setBlock(pos, blockState, Block.UPDATE_NONE);
+-                level.neighborChanged(blockState, blockPos, this, null, false);
+-            }
+-
+-            if (ageValue < 15) {
+-                level.setBlock(pos, state.setValue(AGE, ageValue + 1), Block.UPDATE_NONE);
+-            }
+-        }
++        // Neodium Custom: cactus growth disabled
+     }
+ 
+     @Override
+@@ -127,6 +76,12 @@ public class CactusBlock extends Block implements BonemealableBlock { // Purpur
+         BlockState neighborState,
+         RandomSource random
+     ) {
++        // Comme StemBlock : sur base Nexo, éviter canSurvive faux négatif quand un voisin latéral notifie.
++        if (direction != Direction.DOWN) {
++            if (org.bukkit.craftbukkit.neodium.NexoCustomBlockHelper.isMechanicBase(level, pos.below())) {
++                return state;
++            }
++        }
+         if (!state.canSurvive(level, pos)) {
+             scheduledTickAccess.scheduleTick(pos, this, 1);
+         }
+@@ -141,15 +96,11 @@ public class CactusBlock extends Block implements BonemealableBlock { // Purpur
+     }
+     protected boolean canSurvive(LevelReader level, BlockPos pos) {
+         // Pluto end - Check if the cactus can even survive being placed
+-        for (Direction direction : Direction.Plane.HORIZONTAL.faces) { // Pluto - Expose Direction$Plane's faces
+-            BlockState blockState = level.getBlockState(pos.relative(direction));
+-            if ((level.getWorldBorder().world == null || level.getWorldBorder().world.purpurConfig.cactusBreaksFromSolidNeighbors) && blockState.isSolid() || level.getFluidState(pos.relative(direction)).is(FluidTags.LAVA)) { // Purpur - Cactus breaks from solid neighbors config
+-                return false;
+-            }
+-        }
+-
+-        BlockState blockState1 = level.getBlockState(pos.below());
+-        return (blockState1.is(Blocks.CACTUS) || blockState1.is(BlockTags.SAND)) && !level.getBlockState(pos.above()).liquid();
++        BlockState below = level.getBlockState(pos.below());
++        BlockPos belowPos = pos.below();
++        boolean base = below.is(Blocks.CACTUS) || below.is(BlockTags.SAND)
++            || org.bukkit.craftbukkit.neodium.NexoCustomBlockHelper.matchesCustomBlockId(level, belowPos, "enhance_sand");
++        return base && !level.getBlockState(pos.above()).liquid();
+     }
+ 
+     @Override
+diff --git a/net/minecraft/world/level/block/CropBlock.java b/net/minecraft/world/level/block/CropBlock.java
+index 372559399ce8a4ce551f4403975879e365e1ad75..ec553cb9591e629149397258d3b8dcd7a9834edd 100644
+--- a/net/minecraft/world/level/block/CropBlock.java
++++ b/net/minecraft/world/level/block/CropBlock.java
+@@ -76,30 +76,28 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
+ 
+     @Override
+     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+-        if (level.getRawBrightness(pos, 0) >= 9) {
+-            int age = this.getAge(state);
+-            if (age < this.getMaxAge()) {
+-                float growthSpeed = getGrowthSpeed(this, level, pos);
+-                // Spigot start
+-                int modifier = 100;
+-                if (this == Blocks.BEETROOTS) {
+-                    modifier = level.spigotConfig.beetrootModifier;
+-                } else if (this == Blocks.CARROTS) {
+-                    modifier = level.spigotConfig.carrotModifier;
+-                } else if (this == Blocks.POTATOES) {
+-                    modifier = level.spigotConfig.potatoModifier;
+-                // Paper start - Fix Spigot growth modifiers
+-                } else if (this == Blocks.TORCHFLOWER_CROP) {
+-                    modifier = level.spigotConfig.torchFlowerModifier;
+-                // Paper end - Fix Spigot growth modifiers
+-                } else if (this == Blocks.WHEAT) {
+-                    modifier = level.spigotConfig.wheatModifier;
+-                }
++        int age = this.getAge(state);
++        if (age < this.getMaxAge()) {
++            float growthSpeed = getGrowthSpeed(this, level, pos);
++            // Spigot start
++            int modifier = 100;
++            if (this == Blocks.BEETROOTS) {
++                modifier = level.spigotConfig.beetrootModifier;
++            } else if (this == Blocks.CARROTS) {
++                modifier = level.spigotConfig.carrotModifier;
++            } else if (this == Blocks.POTATOES) {
++                modifier = level.spigotConfig.potatoModifier;
++            // Paper start - Fix Spigot growth modifiers
++            } else if (this == Blocks.TORCHFLOWER_CROP) {
++                modifier = level.spigotConfig.torchFlowerModifier;
++            // Paper end - Fix Spigot growth modifiers
++            } else if (this == Blocks.WHEAT) {
++                modifier = level.spigotConfig.wheatModifier;
++            }
+ 
+-                if (random.nextFloat() < (modifier / (100.0F * (Math.floor((25.0F / growthSpeed) + 1))))) { // Spigot - SPIGOT-7159: Better modifier resolution
+-                    // Spigot end
+-                    org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, pos, this.getStateForAge(age + 1), Block.UPDATE_CLIENTS); // CraftBukkit
+-                }
++            if (random.nextFloat() < (modifier / (100.0F * (Math.floor((25.0F / growthSpeed) + 1))))) { // Spigot - SPIGOT-7159: Better modifier resolution
++                // Spigot end
++                org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, pos, this.getStateForAge(age + 1), Block.UPDATE_CLIENTS); // CraftBukkit
+             }
+         }
+     }
+@@ -159,11 +157,7 @@ public class CropBlock extends VegetationBlock implements BonemealableBlock {
+ 
+     @Override
+     protected boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
+-        return hasSufficientLight(level, pos) && super.canSurvive(state, level, pos);
+-    }
+-
+-    protected static boolean hasSufficientLight(LevelReader level, BlockPos pos) {
+-        return level.getRawBrightness(pos, 0) >= 8;
++        return super.canSurvive(state, level, pos);
+     }
+ 
+     @Override
+diff --git a/net/minecraft/world/level/block/FarmBlock.java b/net/minecraft/world/level/block/FarmBlock.java
+index 7ec5ef85dbface0ff194a7112d0c4b8e25cab6fe..ef9600c60435cdb106af86c8ad365ea83df546cd 100644
+--- a/net/minecraft/world/level/block/FarmBlock.java
++++ b/net/minecraft/world/level/block/FarmBlock.java
+@@ -97,21 +97,18 @@ public class FarmBlock extends Block {
+         int moistureValue = state.getValue(MOISTURE);
+         if (moistureValue > 0 && level.paperConfig().tickRates.wetFarmland != 1 && (level.paperConfig().tickRates.wetFarmland < 1 || (net.minecraft.server.MinecraftServer.currentTick + pos.hashCode()) % level.paperConfig().tickRates.wetFarmland != 0)) { return; } // Paper - Configurable random tick rates for blocks
+         if (moistureValue == 0 && level.paperConfig().tickRates.dryFarmland != 1 && (level.paperConfig().tickRates.dryFarmland < 1 || (net.minecraft.server.MinecraftServer.currentTick + pos.hashCode()) % level.paperConfig().tickRates.dryFarmland != 0)) { return; } // Paper - Configurable random tick rates for blocks
+-        if (!isNearWater(level, pos) && !level.isRainingAt(pos.above())) {
+-            if (moistureValue > 0) {
+-                org.bukkit.craftbukkit.event.CraftEventFactory.handleMoistureChangeEvent(level, pos, state.setValue(MOISTURE, moistureValue - 1), Block.UPDATE_CLIENTS); // CraftBukkit
+-            } else if (!shouldMaintainFarmland(level, pos)) {
+-                turnToDirt(null, state, level, pos);
+-            }
+-        } else if (moistureValue < 7) {
+-            org.bukkit.craftbukkit.event.CraftEventFactory.handleMoistureChangeEvent(level, pos, state.setValue(MOISTURE, 7), Block.UPDATE_CLIENTS); // CraftBukkit
++        // Neodium Custom: keep farmland permanently wet on random tick
++        if (moistureValue < MAX_MOISTURE) {
++            org.bukkit.craftbukkit.event.CraftEventFactory.handleMoistureChangeEvent(level, pos, state.setValue(MOISTURE, MAX_MOISTURE), Block.UPDATE_CLIENTS); // CraftBukkit
+         }
+     }
+ 
+     @Override
+     public void fallOn(Level level, BlockState state, BlockPos pos, Entity entity, double fallDistance) {
+         super.fallOn(level, state, pos, entity, fallDistance); // CraftBukkit - moved here as game rules / events shouldn't affect fall damage.
++        // Neodium Custom: joueurs ne piétinent pas la terre labourée (saut / atterrissage)
+         if (level instanceof ServerLevel serverLevel
++            && !(entity instanceof Player)
+             && (serverLevel.purpurConfig.farmlandTrampleHeight >= 0D ? fallDistance >= serverLevel.purpurConfig.farmlandTrampleHeight : level.random.nextFloat() < fallDistance - 0.5) // Purpur - Configurable farmland trample height
+             && entity instanceof LivingEntity
+             && (entity instanceof Player || serverLevel.getGameRules().get(GameRules.MOB_GRIEFING, serverLevel.purpurConfig.farmlandMobGriefingOverride)) // Purpur - Add mobGriefing override to everything affected
+diff --git a/net/minecraft/world/level/block/PitcherCropBlock.java b/net/minecraft/world/level/block/PitcherCropBlock.java
+index cbaf7ea236e8689793af65f29af3f1860644d152..a513c1e36297d0bdd7567803262149cede57ce4d 100644
+--- a/net/minecraft/world/level/block/PitcherCropBlock.java
++++ b/net/minecraft/world/level/block/PitcherCropBlock.java
+@@ -101,7 +101,7 @@ public class PitcherCropBlock extends DoublePlantBlock implements BonemealableBl
+ 
+     @Override
+     public boolean canSurvive(BlockState state, LevelReader level, BlockPos pos) {
+-        return (!isLower(state) || sufficientLight(level, pos)) && super.canSurvive(state, level, pos);
++        return super.canSurvive(state, level, pos);
+     }
+ 
+     @Override
+@@ -162,10 +162,6 @@ public class PitcherCropBlock extends DoublePlantBlock implements BonemealableBl
+         return blockState.isAir() || blockState.is(Blocks.PITCHER_CROP);
+     }
+ 
+-    private static boolean sufficientLight(LevelReader level, BlockPos pos) {
+-        return CropBlock.hasSufficientLight(level, pos);
+-    }
+-
+     private static boolean isLower(BlockState state) {
+         return state.is(Blocks.PITCHER_CROP) && state.getValue(HALF) == DoubleBlockHalf.LOWER;
+     }
+@@ -175,7 +171,7 @@ public class PitcherCropBlock extends DoublePlantBlock implements BonemealableBl
+     }
+ 
+     private boolean canGrow(LevelReader level, BlockPos pos, BlockState state, int age) {
+-        return !this.isMaxAge(state) && sufficientLight(level, pos) && (!isDouble(age) || canGrowInto(level, pos.above()));
++        return !this.isMaxAge(state) && (!isDouble(age) || canGrowInto(level, pos.above()));
+     }
+ 
+     private boolean isMaxAge(BlockState state) {
+diff --git a/net/minecraft/world/level/block/StemBlock.java b/net/minecraft/world/level/block/StemBlock.java
+index 82ea0ce3895108d477d10e901e756a27a3a9cedc..ac68fc4c00ee411351dad208f84e0d88a1dd9846 100644
+--- a/net/minecraft/world/level/block/StemBlock.java
++++ b/net/minecraft/world/level/block/StemBlock.java
+@@ -11,6 +11,7 @@ import net.minecraft.core.registries.Registries;
+ import net.minecraft.resources.ResourceKey;
+ import net.minecraft.server.level.ServerLevel;
+ import net.minecraft.tags.BlockTags;
++import net.minecraft.world.level.ScheduledTickAccess;
+ import net.minecraft.util.Mth;
+ import net.minecraft.util.RandomSource;
+ import net.minecraft.world.item.Item;
+@@ -63,34 +64,82 @@ public class StemBlock extends VegetationBlock implements BonemealableBlock {
+ 
+     @Override
+     protected boolean mayPlaceOn(BlockState state, BlockGetter level, BlockPos pos) {
+-        return state.is(Blocks.FARMLAND);
++        if (state.is(Blocks.FARMLAND)) {
++            return true;
++        }
++        // Neodium: enhance_soil — melon seeds only, not pumpkin
++        if (this == Blocks.MELON_STEM) {
++            return org.bukkit.craftbukkit.neodium.NexoCustomBlockHelper.matchesCustomBlockId(level, pos, "enhance_soil");
++        }
++        return false;
++    }
++
++    @Override
++    protected BlockState updateShape(
++        BlockState state,
++        LevelReader level,
++        ScheduledTickAccess scheduledTickAccess,
++        BlockPos pos,
++        Direction direction,
++        BlockPos neighborPos,
++        BlockState neighborState,
++        RandomSource random
++    ) {
++        // Voisin latéral / au-dessus : le bloc support (sous la tige) n'est pas celui qui a changé.
++        // Sur note_block Nexo, nexoBlocks#customBlockMechanic peut être brièvement null après une
++        // notification de bloc voisin ; ne pas repasser par VegetationBlock (air immédiat) ni planifier une casse.
++        if (direction != Direction.DOWN) {
++            if (org.bukkit.craftbukkit.neodium.NexoCustomBlockHelper.isMechanicBase(level, pos.below())) {
++                return state;
++            }
++        }
++        if (!state.canSurvive(level, pos)) {
++            if (!(level instanceof ServerLevel serverLevel && serverLevel.hasPhysicsEvent)
++                || !org.bukkit.craftbukkit.event.CraftEventFactory.callBlockPhysicsEvent(serverLevel, pos).isCancelled()) {
++                scheduledTickAccess.scheduleTick(pos, this, 1);
++                return state;
++            }
++        }
++        return super.updateShape(state, level, scheduledTickAccess, pos, direction, neighborPos, neighborState, random);
++    }
++
++    @Override
++    protected void tick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
++        if (!state.canSurvive(level, pos)) {
++            level.destroyBlock(pos, true);
++        }
+     }
+ 
+     @Override
+     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+-        if (level.getRawBrightness(pos, 0) >= 9) {
+-            float growthSpeed = CropBlock.getGrowthSpeed(this, level, pos);
+-            if (random.nextFloat() < ((this == Blocks.PUMPKIN_STEM ? level.spigotConfig.pumpkinModifier : level.spigotConfig.melonModifier) / (100.0F * (Math.floor((25.0F / growthSpeed) + 1))))) { // Spigot - SPIGOT-7159: Better modifier resolution
+-                int ageValue = state.getValue(AGE);
+-                if (ageValue < 7) {
+-                    state = state.setValue(AGE, ageValue + 1);
+-                    org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, pos, state, Block.UPDATE_CLIENTS); // CraftBukkit
+-                } else {
+-                    Direction randomDirection = Direction.Plane.HORIZONTAL.getRandomDirection(random);
+-                    BlockPos blockPos = pos.relative(randomDirection);
+-                    BlockState blockState = level.getBlockState(blockPos.below());
+-                    if (level.getBlockState(blockPos).isAir() && (blockState.is(Blocks.FARMLAND) || blockState.is(BlockTags.DIRT))) {
+-                        Registry<Block> registry = level.registryAccess().lookupOrThrow(Registries.BLOCK);
+-                        Optional<Block> optional = registry.getOptional(this.fruit);
+-                        Optional<Block> optional1 = registry.getOptional(this.attachedStem);
+-                        if (optional.isPresent() && optional1.isPresent()) {
+-                            // CraftBukkit start
+-                            if (!org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, blockPos, optional.get().defaultBlockState(), Block.UPDATE_ALL)) {
+-                                return;
+-                            }
+-                            // CraftBukkit end
+-                            level.setBlockAndUpdate(pos, optional1.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, randomDirection));
++        float growthSpeed = CropBlock.getGrowthSpeed(this, level, pos);
++        if (this == Blocks.MELON_STEM && org.bukkit.craftbukkit.neodium.NexoCustomBlockHelper.matchesCustomBlockId(level, pos.below(), "enhance_soil")) {
++            growthSpeed *= 1.5F;
++        }
++        if (random.nextFloat() < ((this == Blocks.PUMPKIN_STEM ? level.spigotConfig.pumpkinModifier : level.spigotConfig.melonModifier) / (100.0F * (Math.floor((25.0F / growthSpeed) + 1))))) { // Spigot - SPIGOT-7159: Better modifier resolution
++            int ageValue = state.getValue(AGE);
++            if (ageValue < 7) {
++                state = state.setValue(AGE, ageValue + 1);
++                org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, pos, state, Block.UPDATE_CLIENTS); // CraftBukkit
++            } else {
++                // Neodium Custom: disable melon fruit growth from stems
++                if (this == Blocks.MELON_STEM) {
++                    return;
++                }
++                Direction randomDirection = Direction.Plane.HORIZONTAL.getRandomDirection(random);
++                BlockPos blockPos = pos.relative(randomDirection);
++                BlockState blockState = level.getBlockState(blockPos.below());
++                if (level.getBlockState(blockPos).isAir() && (blockState.is(Blocks.FARMLAND) || blockState.is(BlockTags.DIRT) || blockState.is(Blocks.WHITE_GLAZED_TERRACOTTA) || blockState.is(Blocks.BLUE_GLAZED_TERRACOTTA) || blockState.is(Blocks.ORANGE_GLAZED_TERRACOTTA) || blockState.is(Blocks.MAGENTA_GLAZED_TERRACOTTA))) { // Neodium Custom: pumpkin/melon can grow on glazed terracotta
++                    Registry<Block> registry = level.registryAccess().lookupOrThrow(Registries.BLOCK);
++                    Optional<Block> optional = registry.getOptional(this.fruit);
++                    Optional<Block> optional1 = registry.getOptional(this.attachedStem);
++                    if (optional.isPresent() && optional1.isPresent()) {
++                        // CraftBukkit start
++                        if (!org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, blockPos, optional.get().defaultBlockState(), Block.UPDATE_ALL)) {
++                            return;
+                         }
++                        // CraftBukkit end
++                        level.setBlockAndUpdate(pos, optional1.get().defaultBlockState().setValue(HorizontalDirectionalBlock.FACING, randomDirection));
+                     }
+                 }
+             }
+diff --git a/net/minecraft/world/level/block/SweetBerryBushBlock.java b/net/minecraft/world/level/block/SweetBerryBushBlock.java
+index 3d2bd187cb9f83f9369d11b21c484c21ceba0569..5d5efff22f31d5d0492278716572eef1384fb3bf 100644
+--- a/net/minecraft/world/level/block/SweetBerryBushBlock.java
++++ b/net/minecraft/world/level/block/SweetBerryBushBlock.java
+@@ -71,7 +71,7 @@ public class SweetBerryBushBlock extends VegetationBlock implements Bonemealable
+     @Override
+     protected void randomTick(BlockState state, ServerLevel level, BlockPos pos, RandomSource random) {
+         int ageValue = state.getValue(AGE);
+-        if (ageValue < 3 && random.nextFloat() < (level.spigotConfig.sweetBerryModifier / (100.0F * 5)) && level.getRawBrightness(pos.above(), 0) >= 9) { // Spigot - SPIGOT-7159: Better modifier resolution
++        if (ageValue < 3 && random.nextFloat() < (level.spigotConfig.sweetBerryModifier / (100.0F * 5))) { // Spigot - SPIGOT-7159; Neodium: no light gate (fève / sweet berry bush)
+             BlockState blockState = state.setValue(AGE, ageValue + 1);
+             if (!org.bukkit.craftbukkit.event.CraftEventFactory.handleBlockGrowEvent(level, pos, blockState, Block.UPDATE_CLIENTS)) return; // CraftBukkit
+             level.gameEvent(GameEvent.BLOCK_CHANGE, pos, GameEvent.Context.of(blockState));
